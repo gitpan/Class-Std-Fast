@@ -12,7 +12,7 @@ if ( not $ENV{TEST_AUTHOR} ) {
     plan( skip_all => $msg );
 }
 
-eval { use Test::Prereq::Build };
+eval 'use Test::Prereq::Build';
 
 if ( $EVAL_ERROR ) {
     my $msg = 'Test::Prereq::Build not installed; skipping';

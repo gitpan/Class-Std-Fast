@@ -1,6 +1,6 @@
 package Class::Std::Fast;
 
-use version; $VERSION = qv('0.0.1');
+use version; $VERSION = qv('0.0.2');
 use strict;
 use warnings;
 use Carp;
@@ -456,15 +456,15 @@ $Author: ac0v $
 
 =item Id
 
-$Id: Fast.pm 169 2007-11-10 17:58:23Z ac0v $
+$Id: Fast.pm 173 2007-11-10 18:45:25Z ac0v $
 
 =item Revision
 
-$Revision: 169 $
+$Revision: 173 $
 
 =item Date
 
-$Date: 2007-11-10 18:58:23 +0100 (Sat, 10 Nov 2007) $
+$Date: 2007-11-10 19:45:25 +0100 (Sat, 10 Nov 2007) $
 
 =item HeadURL
 
@@ -480,7 +480,10 @@ Martin Kutter C<< <martin.kutter@fen-net.de> >>
 
 =head1 LICENSE AND COPYRIGHT
 
-Copyright (c) 2007, Andreas 'ac0v' Specht C<< <ACID@cpan.org> >>.
+Copyright (c) 2007, Andreas Specht C<< <ACID@cpan.org> >>.
 All rights reserved.
+
+This module is free software; you can redistribute it and/or
+modify it under the same terms as Perl itself.
 
 =cut
