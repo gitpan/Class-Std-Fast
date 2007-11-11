@@ -1,6 +1,6 @@
 package Class::Std::Fast;
 
-use version; $VERSION = qv('0.0.2');
+use version; $VERSION = qv('0.0.3');
 use strict;
 use warnings;
 use Carp;
@@ -93,6 +93,11 @@ sub MODIFY_HASH_ATTRIBUTES {
 #                    return $_[0];
                     return;
                 }
+            }
+            if (defined($optimization_level_of{$package}) 
+                && $optimization_level_of{$package} >= 3) {
+                 no strict qw(refs);
+		         *{ $package . '::___' . $getter } = \$attr;
             }
         }
         undef $attr;
@@ -210,40 +215,26 @@ sub new {
 # It performs the following tasks:
 # - traverse the @ISA hierarchy
 #   - for every base class
-#       - call DEMOLISH if there is such a method with $_[0], ${$_[0]} as 
+#       - call DEMOLISH if there is such a method with $_[0], ${$_[0]} as
 #         arguments (read as: $self, $id).
 #       - delete the element with key ${ $_[0] } from all :ATTR hashes
 sub DESTROY {
+    my $ident = ${$_[0]};
+    my $class = ref $_[0];
     push @_, ${$_[0]};
     no strict qw(refs);
 
     # Shortcut: check @ISA - saves us a method call if 0...
-    if (@{ ref($_[0]) . '::ISA' } == 0) {
-        # we don't call class' DEMOLISH when called with qw(2)
-        if ($optimization_level_of{ref $_[0]}<2) {
-            if (my $demolish_ref = *{ ref $_[0] . '::DEMOLISH'}{CODE}) {
-                # call with & to pass aruments in @_ - dirty but fast...
-                &{$demolish_ref};
-            }           
-        }
-        for ( @{$attribute{ref $_[0]}} ) {
-            delete $_->{'ref'}->{${$_[0]}};
-        }    
-        return;    
-    }
-
-    DEMOLISH: for my $base_class (Class::Std::_hierarchy_of(ref $_[0])) {
-        no strict 'refs';
+    DEMOLISH: for my $base_class ($class, @{"$class\::ISA"} == 0 ? () : Class::Std::_hierarchy_of($class) ) {
         # maybe use exists &$base_class::DEMOLISH ? should be a bit faster...
-        if (my $demolish_ref = *{$base_class.'::DEMOLISH'}{CODE}) {
+        if ( my $demolish_ref = *{"$base_class\::DEMOLISH"}{CODE} ) {
             # call with & to pass aruments in @_ - dirty but fast...
             &{$demolish_ref};
         }
-        for ( @{$attribute{$base_class}} ) {
-            delete $_->{'ref'}->{${$_[0]}};
-        }
+        delete $_->{ref}->{$ident} for @{$attribute{$class}};
     }
     return;
+
 }
 
 {
@@ -321,7 +312,7 @@ methods are ignored.
     1;
     my $fast_obj = FastObject->new();
 
-    # or if you don't need any BUILD, START or DEMOLISH methods
+    # or if you don't need any BUILD or START methods
     package FasterObject;
     use Class::Std::Fast qw(2);
 
@@ -340,13 +331,20 @@ for downward compatibility.
     # use
     my $ident = ${$self};
 
+=head2 initialize
+
+    Class::Std::Fast::initialize();
+
+Imported from L<Class::Std>. Please look at the documentation from
+L<Class::Std> for more details.
+
 =head2 Method for accessing Class::Std::Fast's internals
 
-Class::Std::Fast exposes some of it's internals to allow the construction 
-of Class::Std::Fast based objects from outside the auto-generated 
+Class::Std::Fast exposes some of it's internals to allow the construction
+of Class::Std::Fast based objects from outside the auto-generated
 constructors.
 
-You should never use these methods for doing anything else. In fact you 
+You should never use these methods for doing anything else. In fact you
 should not use these methods at all, unless you know what you're doing.
 
 =head2 ID
@@ -382,7 +380,7 @@ from C with
 
 =head1 DIAGNOSTICS
 
-see Class::Std
+see L<Class::Std>
 
 =head1 CONFIGURATION AND ENVIRONMENT
 
@@ -392,21 +390,21 @@ see Class::Std
 
 =item *
 
-version
+L<version>
 
 =item *
 
-Class::Std
+L<Class::Std>
 
 =item *
 
-Carp
+L<Carp>
 
 =back
 
 =head1 INCOMPATIBILITIES
 
-see Class::Std
+see L<Class::Std>
 
 =head1 BUGS AND LIMITATIONS
 
@@ -427,8 +425,8 @@ classes like Object::InsideOut could work, you would have to make sure that
 object IDs cannot be duplicated. It is therefore strongly discouraged to
 build classes with Class::Std::Fast derived from non-Class::Std::Fast classes.
 
-If you really need to inherit from non-Class::Std::Fast modules, make sure 
-you use Class::Std::Fast::ID as described above for creating objects. 
+If you really need to inherit from non-Class::Std::Fast modules, make sure
+you use Class::Std::Fast::ID as described above for creating objects.
 
 =item * No runtime initialization with "use Class::Std::Fast qw(2);"
 
@@ -456,19 +454,19 @@ $Author: ac0v $
 
 =item Id
 
-$Id: Fast.pm 173 2007-11-10 18:45:25Z ac0v $
+$Id: Fast.pm 179 2007-11-11 21:03:02Z ac0v $
 
 =item Revision
 
-$Revision: 173 $
+$Revision: 179 $
 
 =item Date
 
-$Date: 2007-11-10 19:45:25 +0100 (Sat, 10 Nov 2007) $
+$Date: 2007-11-11 22:03:02 +0100 (Sun, 11 Nov 2007) $
 
 =item HeadURL
 
-$HeadURL: http://svn.hyper-framework.org/Hyper/Class-Std-Fast/branches/2007-11-10/lib/Class/Std/Fast.pm $
+$HeadURL: http://svn.hyper-framework.org/Hyper/Class-Std-Fast/branches/2007-11-11/lib/Class/Std/Fast.pm $
 
 =back
 

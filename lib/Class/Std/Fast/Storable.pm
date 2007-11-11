@@ -1,6 +1,6 @@
 package Class::Std::Fast::Storable;
 
-use version; $VERSION = qv('0.0.1');
+use version; $VERSION = qv('0.0.3');
 use strict;
 use warnings;
 use Carp;
@@ -109,7 +109,8 @@ sub STORABLE_thaw {
             or croak "unknown base class '$package' seen while thawing "
                    . ref $self;
         ATTR:
-        for my $name ( keys  %{$attributes_of_ref->{$package}} ) { #for known attrs...
+        for my $name ( keys  %{$attributes_of_ref->{$package}} ) {
+            # for known attrs...
             # nothing to do if frozen attr doesn't exist
             exists $pkg_attr_ref->{ $name } or next ATTR;
             # block attempts to meddle with existing objects
@@ -132,8 +133,8 @@ sub STORABLE_thaw {
 }
 
 1;
-__END__
 
+__END__
 
 =pod
 
@@ -176,11 +177,11 @@ see method Class::Std::Storable::STORABLE_thaw
 
 =head1 DIAGNOSTICS
 
-see Class::Std
+see L<Class::Std>
 
 and
 
-see Class::Std::Storable
+see L<Class::Std::Storable>
 
 =head1 CONFIGURATION AND ENVIRONMENT
 
@@ -190,25 +191,25 @@ see Class::Std::Storable
 
 =item *
 
-version
+L<version>
 
 =item *
 
-Class::Std
+L<Class::Std>
 
 =item *
 
-Carp
+L<Carp>
 
 =back
 
 =head1 INCOMPATIBILITIES
 
-see Class::Std
+see L<Class::Std>
 
 =head1 BUGS AND LIMITATIONS
 
-see Class::Std
+see L<Class::Std>
 
 =head1 RCS INFORMATIONS
 
@@ -220,19 +221,19 @@ $Author: ac0v $
 
 =item Id
 
-$Id: Storable.pm 173 2007-11-10 18:45:25Z ac0v $
+$Id: Storable.pm 178 2007-11-11 19:45:59Z ac0v $
 
 =item Revision
 
-$Revision: 173 $
+$Revision: 178 $
 
 =item Date
 
-$Date: 2007-11-10 19:45:25 +0100 (Sat, 10 Nov 2007) $
+$Date: 2007-11-11 20:45:59 +0100 (Sun, 11 Nov 2007) $
 
 =item HeadURL
 
-$HeadURL: http://svn.hyper-framework.org/Hyper/Class-Std-Fast/branches/2007-11-10/lib/Class/Std/Fast/Storable.pm $
+$HeadURL: http://svn.hyper-framework.org/Hyper/Class-Std-Fast/branches/2007-11-11/lib/Class/Std/Fast/Storable.pm $
 
 =back
 

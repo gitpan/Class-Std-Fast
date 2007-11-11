@@ -1,4 +1,8 @@
-use Test::More tests => 44;
+# if you execute this script directly it say's
+# Looks like you planned 47 tests but only ran 44.
+# because the destructos / DEMOLISH methods won't be
+# executed
+use Test::More tests => 47;
 
 eval q{
     package MyBase;
@@ -44,7 +48,7 @@ eval q{
         sub rest : RESTRICTED {
             ::ok 1, 'Accessed restricted';
         }
-        
+
         Class::Std::Fast::initialize;
     }
 
