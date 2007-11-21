@@ -1,4 +1,8 @@
 Revision history for Class-Std-Fast
+0.0.4   Tue Nov 20 19:44:00 2007
+        * Introduced named options for import
+        * Added object caching
+        * updated tests
 
 0.0.3   Tue Nov 11 22:10:00 2007
         * fixed DESTROY/DEMOLISH methods,

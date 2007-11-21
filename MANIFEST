@@ -1,3 +1,4 @@
+benchmark/can.pl
 benchmark/class-std.pl
 Build.PL
 Changes
@@ -16,6 +17,7 @@ t/access_automethod.t
 t/access_name.t
 t/automethod.t
 t/begin-coercion.t
+t/caching.t
 t/coercions.t
 t/cumulative.t
 t/dump.t

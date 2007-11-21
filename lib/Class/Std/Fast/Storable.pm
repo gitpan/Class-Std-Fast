@@ -1,9 +1,10 @@
 package Class::Std::Fast::Storable;
 
-use version; $VERSION = qv('0.0.3');
+use version; $VERSION = qv('0.0.4');
 use strict;
 use warnings;
 use Carp;
+use List::Util qw(first);
 
 BEGIN {
     require Class::Std::Fast;
@@ -12,7 +13,6 @@ BEGIN {
 
 my $attributes_of_ref = {};
 my @exported_subs = qw(
-    Class::Std::Fast::new
     Class::Std::Fast::ident
     Class::Std::Fast::DESTROY
     Class::Std::Fast::MODIFY_CODE_ATTRIBUTES
@@ -25,8 +25,36 @@ my @exported_subs = qw(
 
 sub import {
     my $caller_package = caller;
+    
+    my %flags = (@_>=3) 
+            ? @_[1..$#_]
+            : (@_==2) && $_[1] >=2 
+                ? ( constructor =>  'basic', cache => 0 )
+                : ( constructor => 'normal', cache => 0);
+    $flags{cache} = 0 if not defined $flags{cache};
+    $flags{constructor} = 'normal' if not defined $flags{constructor};
+
+    Class::Std::Fast::_init_class_cache( $caller_package )
+        if ($flags{cache});
+    
     no strict qw(refs);
-    Class::Std::Fast::_set_optimization_level($caller_package => $_[1]);
+
+    if ($flags{constructor} eq 'normal') {
+        *{ $caller_package . '::new' } = \&Class::Std::Fast::new;
+    }
+    elsif ($flags{constructor} eq 'basic' && $flags{cache}) {
+        *{ $caller_package . '::new' } = \&Class::Std::Fast::_new_basic_cache;
+    }
+    elsif ($flags{constructor} eq 'basic' && ! $flags{cache}) {
+        *{ $caller_package . '::new' } = \&Class::Std::Fast::_new_basic;
+    }
+    elsif ($flags{constructor} eq 'none' ) {
+        # nothing to do
+    }
+    else {
+        die "Illegal import flags constructor => '$flags{constructor}', cache => '$flags{cache}'";
+    }
+    
     for my $name ( @exported_subs ) {
         my ($sub_name) = $name =~ m{(\w+)\z}xms;
         *{ $caller_package . '::' . $sub_name } = \&{$name};
@@ -221,19 +249,19 @@ $Author: ac0v $
 
 =item Id
 
-$Id: Storable.pm 178 2007-11-11 19:45:59Z ac0v $
+$Id: Storable.pm 204 2007-11-21 02:44:18Z ac0v $
 
 =item Revision
 
-$Revision: 178 $
+$Revision: 204 $
 
 =item Date
 
-$Date: 2007-11-11 20:45:59 +0100 (Sun, 11 Nov 2007) $
+$Date: 2007-11-21 03:44:18 +0100 (Wed, 21 Nov 2007) $
 
 =item HeadURL
 
-$HeadURL: http://svn.hyper-framework.org/Hyper/Class-Std-Fast/branches/2007-11-11/lib/Class/Std/Fast/Storable.pm $
+$HeadURL: http://svn.hyper-framework.org/Hyper/Class-Std-Fast/branches/2007-11-21/lib/Class/Std/Fast/Storable.pm $
 
 =back
 
