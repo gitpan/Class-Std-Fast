@@ -52,8 +52,8 @@ package main;
 print "Info:
 Each test creates an object an stacks two objects into it (two levels)\n";
 
-for my $class ('MyBenchTestFastCache', 'MyBenchTestFastBasic', 'MyBenchTestFast', 'MyBenchTest') {
-    my $n = 50000;
+for my $class ('MyBenchTestFastCache', 'MyBenchTestFastBasic') { #}, 'MyBenchTestFast', 'MyBenchTest') {
+    my $n = 100000;
     print "\n$class ($n iterations - first run)\n";
     timethis $n, sub {
         push @list,  $class->new();

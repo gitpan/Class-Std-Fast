@@ -1,14 +1,12 @@
 package Class::Std::Fast::Storable;
 
-use version; $VERSION = qv('0.0.4');
+use version; $VERSION = qv('0.0.5');
 use strict;
 use warnings;
 use Carp;
-use List::Util qw(first);
 
 BEGIN {
     require Class::Std::Fast;
-    no strict qw(refs);
 }
 
 my $attributes_of_ref = {};
@@ -25,7 +23,7 @@ my @exported_subs = qw(
 
 sub import {
     my $caller_package = caller;
-    
+
     my %flags = (@_>=3) 
             ? @_[1..$#_]
             : (@_==2) && $_[1] >=2 
@@ -36,7 +34,7 @@ sub import {
 
     Class::Std::Fast::_init_class_cache( $caller_package )
         if ($flags{cache});
-    
+
     no strict qw(refs);
 
     if ($flags{constructor} eq 'normal') {
@@ -54,7 +52,7 @@ sub import {
     else {
         die "Illegal import flags constructor => '$flags{constructor}', cache => '$flags{cache}'";
     }
-    
+
     for my $name ( @exported_subs ) {
         my ($sub_name) = $name =~ m{(\w+)\z}xms;
         *{ $caller_package . '::' . $sub_name } = \&{$name};
@@ -75,7 +73,7 @@ sub MODIFY_HASH_ATTRIBUTES {
 }
 
 sub STORABLE_freeze {
-    # TODO do we really need to unpack @_? We're getting called for 
+    # TODO do we really need to unpack @_? We're getting called for
     # Zillions of objects...
     my($self, $cloning) = @_;
     $self->can('STORABLE_freeze_pre')
@@ -84,7 +82,7 @@ sub STORABLE_freeze {
     my %frozen_attr; #to be constructed
     my $id           = ${$self};
     my @package_list = ref $self;
-    my %package_seen = ( $package_list[0]  => 1 ); #ignore diamond/looped base classes :-)
+    my %package_seen = ( $package_list[0]  => 1 ); # ignore diamond/looped base classes :-)
 
     no strict qw(refs);
     PACKAGE:
@@ -92,10 +90,10 @@ sub STORABLE_freeze {
         #make sure we add any base classes to the list of
         #packages to examine for attributes.
 
-        # TODO ! $package_seen{$_}++ looks like a pretty slow test: it 
+        # TODO ! $package_seen{$_}++ looks like a pretty slow test: it
         # performs ++ on every entry in @ISA.
         # Try something like 
-        # "(not exists $package_seen{$_}) || $package_seen{$_}++" and 
+        # "(not exists $package_seen{$_}) || $package_seen{$_}++" and
         # benchmark... 
         push @package_list, grep { ! $package_seen{$_}++; } @{"${package}::ISA"};
 
@@ -121,7 +119,7 @@ sub STORABLE_thaw {
     # croak "must be called from Storable" unless caller eq 'Storable';
     # unfortunately, Storable never appears on the call stack.
 
-    # TODO do we really need to unpack @_? We're getting called for 
+    # TODO do we really need to unpack @_? We're getting called for
     # zillions of objects...
     my $self = shift;
     my $cloning = shift;
@@ -172,7 +170,7 @@ Class::Std::Fast::Storable - Fast Storable InsideOut objects
 
 =head1 VERSION
 
-This document describes Class::Std::Fast::Storable 0.01
+This document describes Class::Std::Fast::Storable 0..0.5
 
 =head1 SYNOPSIS
 
@@ -249,19 +247,19 @@ $Author: ac0v $
 
 =item Id
 
-$Id: Storable.pm 204 2007-11-21 02:44:18Z ac0v $
+$Id: Storable.pm 211 2007-12-02 03:57:28Z ac0v $
 
 =item Revision
 
-$Revision: 204 $
+$Revision: 211 $
 
 =item Date
 
-$Date: 2007-11-21 03:44:18 +0100 (Wed, 21 Nov 2007) $
+$Date: 2007-12-02 04:57:28 +0100 (Sun, 02 Dec 2007) $
 
 =item HeadURL
 
-$HeadURL: http://svn.hyper-framework.org/Hyper/Class-Std-Fast/branches/2007-11-21/lib/Class/Std/Fast/Storable.pm $
+$HeadURL: http://svn.hyper-framework.org/Hyper/Class-Std-Fast/branches/2007-12-02/lib/Class/Std/Fast/Storable.pm $
 
 =back
 

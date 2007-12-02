@@ -1,10 +1,9 @@
 package Class::Std::Fast;
 
-use version; $VERSION = qv('0.0.4');
+use version; $VERSION = qv('0.0.5');
 use strict;
 use warnings;
 use Carp;
-use List::Util qw(first);
 
 BEGIN {
     require Class::Std;
@@ -21,7 +20,7 @@ my %attribute;
 my %optimization_level_of = ();
 my $instance_counter      = 1;
 
-# use () prototype to indicate to perl that it does not need to prepare an 
+# use () prototype to indicate to perl that it does not need to prepare an
 # argument stack
 sub OBJECT_CACHE_REF () { return \%object_cache_of };
 sub ID_GENERATOR_REF () { return \$instance_counter };
@@ -57,8 +56,8 @@ sub ident ($) {
 
 sub _init_class_cache {
     $do_cache_class_of{ $_[0] } = 1;
-    $object_cache_of{ $_[0] } ||= [];    
-} 
+    $object_cache_of{ $_[0] } ||= [];
+}
 
 sub import {
     my $caller_package = caller;
@@ -89,7 +88,7 @@ sub import {
         # nothing to do
     }
     else {
-        die "Illegal import flags constructor => '$flags{constructor}', cache => '$flags{cache}'";
+        croak "Illegal import flags constructor => '$flags{constructor}', cache => '$flags{cache}'";
     }
 
     for my $sub ( @exported_subs ) {
@@ -190,7 +189,7 @@ sub new {
         if ($#_) && ref $_[1] ne 'HASH';
 
     # try cache first if caching is enabled for this class
-    my $new_obj    = exists $do_cache_class_of{ $_[0] }
+    my $new_obj = exists($do_cache_class_of{ $_[0] })
         && pop @{ $object_cache_of{ $_[0] } }
         || bless \(my $another_anon_scalar = $instance_counter++), $_[0];
 
@@ -266,28 +265,26 @@ sub DESTROY {
     no strict qw(refs);
 
     # Shortcut: check @ISA - saves us a method call if 0...
-    DEMOLISH: for my $base_class ($class, @{"$class\::ISA"} == 0 ? () : Class::Std::_hierarchy_of($class) ) {
-        # maybe use exists &$base_class::DEMOLISH ? should be a bit faster...
-        # exists is a magnintude faster than symbol table access...
+    DEMOLISH: for my $base_class (scalar @{ "$class\::ISA"}
+        ? Class::Std::_hierarchy_of($class) 
+        : ($class) ) {
         # call by & to tell perl that it doesn't need to put up a new argument
         # stack
         &{"$base_class\::DEMOLISH"} 
             if ( exists(&{"$base_class\::DEMOLISH"}) );
 
         # postfix for saves a block
-        delete $_->{ref}->{$ident} 
-            for @{$attribute{$class}};
+        delete $_->{ref}->{$ident} for (@{$attribute{$base_class}});
     }
 
     # call with @_ as arguments - dirty but fast...
     &Class::Std::Fast::_cache if exists($do_cache_class_of{ $class });
-  
+
     return;
 }
 
 sub _cache {
-    push @{ $object_cache_of{ ref $_[0] }}, $_[0];
-    return;
+    push @{ $object_cache_of{ ref $_[0] }}, bless $_[0], ref $_[0];
 }
 
 # clean out cache method to prevent it being called in global destruction
@@ -335,7 +332,7 @@ Class::Std::Fast - faster but less secure than Class::Std
 
 =head1 VERSION
 
-This document describes Class::Std::Fast 0.01
+This document describes Class::Std::Fast 0.0.5
 
 =head1 SYNOPSIS
 
@@ -363,8 +360,8 @@ faster to scalarify your object.
 
 =head2 new
 
-The constructor acts like Class::Std's constructor. For extended constructors 
-see L</Constructors> below. 
+The constructor acts like Class::Std's constructor. For extended constructors
+see L<Constructors> below.
 
     package FastObject;
     use Class::Std::Fast;
@@ -435,18 +432,18 @@ from C with
 
 Returns a reference to the object cache.
 
-You should never use this method unless your're trying to (re-)create 
-Class::Std::Fast objects from outside Class::Std::Fast (and possibly outside 
+You should never use this method unless your're trying to (re-)create
+Class::Std::Fast objects from outside Class::Std::Fast (and possibly outside
 perl).
 
-See <L/EXTENSIONS TO Class::Std> for a description of the object cache 
+See <L/EXTENSIONS TO Class::Std> for a description of the object cache
 facility.
 
 =head1 EXTENSIONS TO Class::Std
 
 =head2 Constructors
 
-Class::Std::Fast allows the user to chose between several constructor 
+Class::Std::Fast allows the user to chose between several constructor
 options.
 
 =over
@@ -460,10 +457,10 @@ No special synopsis. Acts like Class::Std's constructor
  use Class::Std::Fast qw(2);
  use Class::Std::Fast constructor => 'basic';
 
-Does not call BUILD and START (and does not walk down the inheritance 
+Does not call BUILD and START (and does not walk down the inheritance
 hierarchy calling BUILD and START).
 
-Does not perform any attribute initializations. 
+Does not perform any attribute initializations.
 
 Really fast, but very basic.
 
@@ -500,49 +497,49 @@ If you use the Object Cache (see below) the recommended usage is:
 
 =head3 Description
 
-While inside out objects are basically an implementation of the Flyweight 
-Pattern (object data is stored outside the object), there's still some aspect 
-missing: object reuse. While Class::Std::Fast does not provide flyweights 
-in the classical sense (one object re-used again and again), it provides 
+While inside out objects are basically an implementation of the Flyweight
+Pattern (object data is stored outside the object), there's still some aspect
+missing: object reuse. While Class::Std::Fast does not provide flyweights
+in the classical sense (one object re-used again and again), it provides
 something close to it: An object cache for re-using destroyed objects.
 
-The object cache is implemented as a simple hash with the class names of the 
+The object cache is implemented as a simple hash with the class names of the
 cached objects as keys, and a list ref of cached objects as values.
 
-The object cache is filled by the DESTROY method exported into all  
-Class::Std::Fast based objects: Instead of actually destroying the blessed 
-scalar reference (Class::Std::Fast based objects are nothing more), the 
+The object cache is filled by the DESTROY method exported into all
+Class::Std::Fast based objects: Instead of actually destroying the blessed
+scalar reference (Class::Std::Fast based objects are nothing more), the
 object to be destroyed is pushed it's class' object cache.
 
-new() in turn does not need to create a new blessed scalar, but can just pop 
+new() in turn does not need to create a new blessed scalar, but can just pop
 one off the object cache (which is a magnitude faster).
 
-Using the object cache is recommended for persistent applications (like 
-running under mod_perl), or applications creating, destroying and again 
+Using the object cache is recommended for persistent applications (like
+running under mod_perl), or applications creating, destroying and again
 creating lots of Class::Std::Fast based objects.
 
-The exported constructor automatically uses the Object Cache when caching is 
+The exported constructor automatically uses the Object Cache when caching is
 enabled by setting the cache import fla to a true value.
 
 For an example of a user-defined constructor see L</Constructors> above.
 
 =head3 Memory overhead
 
-The object cache trades speed for memory. This is very perlish way for 
-adressing performance issues, but may cause your application to blow up 
+The object cache trades speed for memory. This is very perlish way for
+adressing performance issues, but may cause your application to blow up
 if you're short of memory.
 
-On a 32bit Linux, Devel::Size reports 44 bytes for a Class::Std::Fast based 
-object - so a cache containing 1 000 000 (one million) of objects needs 
-around 50MB of memory (Devel Size only reports the memory use it can see - 
-the actual usage is system dependent and something between 4 and 32 bytes 
-more). 
+On a 32bit Linux, Devel::Size reports 44 bytes for a Class::Std::Fast based
+object - so a cache containing 1 000 000 (one million) of objects needs
+around 50MB of memory (Devel Size only reports the memory use it can see -
+the actual usage is system dependent and something between 4 and 32 bytes
+more).
 
-If you are anxious about falling short of memory, only enable caching for 
-those classes whose objects you now to be frequently created and destroyed, 
-and leave it off for the less frequently used classes - this gives you both 
-speed benefits, and avoids holding a cache of object that will never be 
-needed again.  
+If you are anxious about falling short of memory, only enable caching for
+those classes whose objects you now to be frequently created and destroyed,
+and leave it off for the less frequently used classes - this gives you both
+speed benefits, and avoids holding a cache of object that will never be
+needed again.
 
 =head1 DIAGNOSTICS
 
@@ -604,13 +601,13 @@ you use Class::Std::Fast::ID as described above for creating objects.
 
 =item * No runtime initialization with constructor => 'basic' / 'none'
 
-When eval'ing Class::Std::Fast based classes using the basic constructor, 
+When eval'ing Class::Std::Fast based classes using the basic constructor,
 make sure the last line is
 
  Class::Std::Fast::initialize();
 
 In contrast to Class::Std, Class::Std::Fast performs no run-time
-initialization when the basic constructor is enabled, so your code has to 
+initialization when the basic constructor is enabled, so your code has to
 do it itself.
 
 The same holds true for constructor => 'none', of course.
@@ -630,19 +627,19 @@ $Author: ac0v $
 
 =item Id
 
-$Id: Fast.pm 204 2007-11-21 02:44:18Z ac0v $
+$Id: Fast.pm 211 2007-12-02 03:57:28Z ac0v $
 
 =item Revision
 
-$Revision: 204 $
+$Revision: 211 $
 
 =item Date
 
-$Date: 2007-11-21 03:44:18 +0100 (Wed, 21 Nov 2007) $
+$Date: 2007-12-02 04:57:28 +0100 (Sun, 02 Dec 2007) $
 
 =item HeadURL
 
-$HeadURL: http://svn.hyper-framework.org/Hyper/Class-Std-Fast/branches/2007-11-21/lib/Class/Std/Fast.pm $
+$HeadURL: http://svn.hyper-framework.org/Hyper/Class-Std-Fast/branches/2007-12-02/lib/Class/Std/Fast.pm $
 
 =back
 

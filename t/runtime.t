@@ -2,7 +2,7 @@
 # Looks like you planned 47 tests but only ran 44.
 # because the destructos / DEMOLISH methods won't be
 # executed
-use Test::More tests => 47;
+use Test::More tests => 45;
 
 eval q{
     package MyBase;
@@ -153,3 +153,5 @@ my $der2 = Der->new({
 is( $der2->get_snum(), 0, 'false values allowable as attribute parameters' );
 
 is( $der2->get_dval, 'dval', 'default values evaled correctly' );
+
+print "# DONE - now comes the cleanup...\n";
