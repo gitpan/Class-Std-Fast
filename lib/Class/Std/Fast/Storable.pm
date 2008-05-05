@@ -1,9 +1,10 @@
 package Class::Std::Fast::Storable;
 
-use version; $VERSION = qv('0.0.5');
+use version; $VERSION = qv('0.0.6');
 use strict;
 use warnings;
 use Carp;
+use Storable;
 
 BEGIN {
     require Class::Std::Fast;
@@ -24,35 +25,19 @@ my @exported_subs = qw(
 sub import {
     my $caller_package = caller;
 
-    my %flags = (@_>=3) 
+    my %flags = (@_>=3)
             ? @_[1..$#_]
-            : (@_==2) && $_[1] >=2 
+            : (@_==2) && $_[1] >=2
                 ? ( constructor =>  'basic', cache => 0 )
                 : ( constructor => 'normal', cache => 0);
     $flags{cache} = 0 if not defined $flags{cache};
     $flags{constructor} = 'normal' if not defined $flags{constructor};
 
-    Class::Std::Fast::_init_class_cache( $caller_package )
-        if ($flags{cache});
+    Class::Std::Fast::_init_import(
+        $caller_package, %flags
+    );
 
     no strict qw(refs);
-
-    if ($flags{constructor} eq 'normal') {
-        *{ $caller_package . '::new' } = \&Class::Std::Fast::new;
-    }
-    elsif ($flags{constructor} eq 'basic' && $flags{cache}) {
-        *{ $caller_package . '::new' } = \&Class::Std::Fast::_new_basic_cache;
-    }
-    elsif ($flags{constructor} eq 'basic' && ! $flags{cache}) {
-        *{ $caller_package . '::new' } = \&Class::Std::Fast::_new_basic;
-    }
-    elsif ($flags{constructor} eq 'none' ) {
-        # nothing to do
-    }
-    else {
-        die "Illegal import flags constructor => '$flags{constructor}', cache => '$flags{cache}'";
-    }
-
     for my $name ( @exported_subs ) {
         my ($sub_name) = $name =~ m{(\w+)\z}xms;
         *{ $caller_package . '::' . $sub_name } = \&{$name};
@@ -72,11 +57,14 @@ sub MODIFY_HASH_ATTRIBUTES {
     return @unhandled;
 }
 
+# It's a constant - so there's no use creating it in each freeze again
+my $FROZEN_ANON_SCALAR = Storable::freeze(\(my $anon_scalar));
+
 sub STORABLE_freeze {
     # TODO do we really need to unpack @_? We're getting called for
     # Zillions of objects...
     my($self, $cloning) = @_;
-    $self->can('STORABLE_freeze_pre')
+    Class::Std::Fast::real_can($self, 'STORABLE_freeze_pre')
         && $self->STORABLE_freeze_pre($cloning);
 
     my %frozen_attr; #to be constructed
@@ -85,34 +73,33 @@ sub STORABLE_freeze {
     my %package_seen = ( $package_list[0]  => 1 ); # ignore diamond/looped base classes :-)
 
     no strict qw(refs);
+
     PACKAGE:
     while( my $package = shift @package_list) {
         #make sure we add any base classes to the list of
         #packages to examine for attributes.
 
-        # TODO ! $package_seen{$_}++ looks like a pretty slow test: it
-        # performs ++ on every entry in @ISA.
-        # Try something like 
-        # "(not exists $package_seen{$_}) || $package_seen{$_}++" and
-        # benchmark... 
-        push @package_list, grep { ! $package_seen{$_}++; } @{"${package}::ISA"};
+        # Original line:
+        # push @package_list, grep { ! $package_seen{$_}++; } @{"${package}::ISA"};
+        # This one's faster...
+        push @package_list, grep { ! exists $package_seen{$_} and $package_seen{$_} = 1; } @{"${package}::ISA"};
 
         #look for any attributes of this object for this package
         my $attr_ref = $attributes_of_ref->{$package} or next PACKAGE;
 
         # TODO replace inner my variable by $_ - faster...
         ATTR:              # examine attributes from known packages only
-        for my $name ( keys %{$attr_ref} ) {
+        for ( keys %{$attr_ref} ) {
             #nothing to do if attr not set for this object
-            exists $attr_ref->{$name}{$id} or next ATTR;
+            exists $attr_ref->{$_}{$id} or next ATTR;
             #save the attr by name into the package hash
-            $frozen_attr{$package}{ $name } = $attr_ref->{$name}{$id};
+            $frozen_attr{$package}{ $_ } = $attr_ref->{$_}{$id};
         }
     }
-    $self->can('STORABLE_freeze_post')
+    Class::Std::Fast::real_can($self, 'STORABLE_freeze_post')
         && $self->STORABLE_freeze_post($cloning, \%frozen_attr);
 
-    return (Storable::freeze( \ (my $anon_scalar) ), \%frozen_attr);
+    return ($FROZEN_ANON_SCALAR, \%frozen_attr);
 }
 
 sub STORABLE_thaw {
@@ -125,27 +112,30 @@ sub STORABLE_thaw {
     my $cloning = shift;
     my $frozen_attr_ref = $_[1]; # TODO Ha?? what's in $_[0], then ??? Check.
 
-    $self->can('STORABLE_thaw_pre') 
+    Class::Std::Fast::real_can($self, 'STORABLE_thaw_pre')
         && $self->STORABLE_thaw_pre($cloning, $frozen_attr_ref);
 
     my $id = ${$self} ||= Class::Std::Fast::ID();
+
     PACKAGE:
     while( my ($package, $pkg_attr_ref) = each %{$frozen_attr_ref} ) {
+        # TODO This test is quite expensive. Is there a better one?
         $self->isa($package)
             or croak "unknown base class '$package' seen while thawing "
                    . ref $self;
         ATTR:
-        for my $name ( keys  %{$attributes_of_ref->{$package}} ) {
+        for ( keys  %{$attributes_of_ref->{$package}} ) {
             # for known attrs...
             # nothing to do if frozen attr doesn't exist
-            exists $pkg_attr_ref->{ $name } or next ATTR;
+            exists $pkg_attr_ref->{$_} or next ATTR;
+
             # block attempts to meddle with existing objects
-            exists $attributes_of_ref->{$package}{$name}{$id}
+            exists $attributes_of_ref->{$package}->{$_}->{$id}
                 and croak "trying to modify existing attributes for $package";
 
             # ok, set the attribute
-            $attributes_of_ref->{$package}{$name}{$id}
-                = delete $pkg_attr_ref->{ $name };
+            $attributes_of_ref->{$package}->{$_}->{$id}
+                = delete $pkg_attr_ref->{$_};
         }
         # this is probably serious enough to throw an exception.
         # however, TODO: it would be nice if the class could somehow
@@ -155,7 +145,8 @@ sub STORABLE_thaw {
                      . join q{, }, keys %$pkg_attr_ref;
     }
 
-    $self->can('STORABLE_thaw_post') && $self->STORABLE_thaw_post($cloning);
+    Class::Std::Fast::real_can($self, 'STORABLE_thaw_post')
+        && $self->STORABLE_thaw_post($cloning);
 }
 
 1;
@@ -170,7 +161,7 @@ Class::Std::Fast::Storable - Fast Storable InsideOut objects
 
 =head1 VERSION
 
-This document describes Class::Std::Fast::Storable 0..0.5
+This document describes Class::Std::Fast::Storable 0.0.6
 
 =head1 SYNOPSIS
 
@@ -189,7 +180,8 @@ This document describes Class::Std::Fast::Storable 0..0.5
 =head1 DESCRIPTION
 
 Class::Std::Fast::Storable does the same as Class::Std::Storable
-does for Class::Std. The API is the same as Class::Std::Storable's.
+does for Class::Std. The API is the same as Class::Std::Storable's, with
+few exceptions.
 
 =head1 SUBROUTINES/METHODS
 
@@ -231,11 +223,14 @@ L<Carp>
 
 =head1 INCOMPATIBILITIES
 
-see L<Class::Std>
+STORABLE_freeze_pre, STORABLE_freeze_post, STORABLE_thaw_pre and
+STORABLE_thaw_post must not be implemented as AUTOMETHOD.
+
+see L<Class::Std> and L<Class::Std::Storable>
 
 =head1 BUGS AND LIMITATIONS
 
-see L<Class::Std>
+see L<Class::Std> and L<Class::Std::Storable>
 
 =head1 RCS INFORMATIONS
 
@@ -247,19 +242,19 @@ $Author: ac0v $
 
 =item Id
 
-$Id: Storable.pm 211 2007-12-02 03:57:28Z ac0v $
+$Id: Storable.pm 435 2008-05-05 11:09:50Z ac0v $
 
 =item Revision
 
-$Revision: 211 $
+$Revision: 435 $
 
 =item Date
 
-$Date: 2007-12-02 04:57:28 +0100 (Sun, 02 Dec 2007) $
+$Date: 2008-05-05 13:09:50 +0200 (Mon, 05 May 2008) $
 
 =item HeadURL
 
-$HeadURL: http://svn.hyper-framework.org/Hyper/Class-Std-Fast/branches/2007-12-02/lib/Class/Std/Fast/Storable.pm $
+$HeadURL: file:///var/svn/repos/Hyper/Class-Std-Fast/branches/0.0.6/lib/Class/Std/Fast/Storable.pm $
 
 =back
 

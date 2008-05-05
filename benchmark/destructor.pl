@@ -38,7 +38,8 @@ Class::Std::initialize;
 1;
 
 package MyBenchTestFastCache;
-use Class::Std::Fast constructor => 'basic', cache => 1 , isa_unsorted => 1;
+use base qw(MyBenchTest);
+use Class::Std::Fast constructor => 'basic', cache => 1, unsorted_isa => 1;
 
 my %one_of :ATTR(:name<one>);
 my %two_of :ATTR(:name<two>);
@@ -49,30 +50,12 @@ Class::Std::initialize;
 
 
 package main;
-print "Info:
-Each test creates an object an stacks two objects into it (two levels)\n";
 
-for my $class ('MyBenchTestFastCache', 'MyBenchTestFastBasic') {
-    #, 'MyBenchTestFast', 'MyBenchTest') {
-    my $n = 100000;
-    print "\n$class ($n iterations - first run)\n";
-    timethis $n, sub {
-        push @list,  $class->new();
-        $list[-1]->set_one($class->new());
-        $list[-1]->get_one()->set_two($class->new());
-        $list[-1]->get_one();
+my $n = 100;
+my $n = 5;
+timethis $n, sub {
+    for my $class ('MyBenchTestFastBasic') {
+        push @list,  $class->new({ one => 'foo', two => 'bar'}) for (1..5000);
+        undef @list
     };
-    print "Cleanup: Destroying ${ \($n *3) } objects\n";
-    timethis 1, sub { undef @list };
-    print "\n$class ($n iterations - second run)\n";
-    timethis $n , sub {
-        push @list,  $class->new();
-        $list[-1]->set_one($class->new());
-        $list[-1]->get_one()->set_two($class->new());
-        $list[-1]->get_one();
-    };
-    print "Cleanup: Destroying ${ \($n *3) } objects\n";
-    timethis 1, sub { undef @list };
-}
-
-
+};

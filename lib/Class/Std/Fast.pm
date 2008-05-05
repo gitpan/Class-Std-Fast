@@ -1,11 +1,21 @@
 package Class::Std::Fast;
 
-use version; $VERSION = qv('0.0.5');
+use version; $VERSION = qv('0.0.6');
 use strict;
 use warnings;
 use Carp;
 
 BEGIN {
+    # warn if we cannot save aray UNIVERSAL::Can (because Class::Std has
+    # already overwritten it...)
+    exists $INC{'Class/Std.pm'}
+        && warn 'Class::Std::Fast loaded too late - put
+>use Class::Std::Fast< somewhere at the top of your application
+';
+
+    # save away UNIVERSAL::can
+    *real_can = \&UNIVERSAL::can;
+
     require Class::Std;
     no strict qw(refs);
     for my $sub ( qw(MODIFY_CODE_ATTRIBUTES AUTOLOAD _mislabelled initialize) ) {
@@ -15,6 +25,7 @@ BEGIN {
 
 my %object_cache_of = ();
 my %do_cache_class_of = ();
+my %destroy_isa_unsorted_of = ();
 
 my %attribute;
 my %optimization_level_of = ();
@@ -59,16 +70,10 @@ sub _init_class_cache {
     $object_cache_of{ $_[0] } ||= [];
 }
 
-sub import {
-    my $caller_package = caller;
-
-    my %flags = (@_>=3) 
-            ? @_[1..$#_]
-            : (@_==2) && $_[1] >=2 
-                ? ( constructor =>  'basic', cache => 0 )
-                : ( constructor => 'normal', cache => 0);
-    $flags{cache} = 0 if not defined $flags{cache};
-    $flags{constructor} = 'normal' if not defined $flags{constructor};
+sub _init_import {
+    my ($caller_package, %flags) = @_;
+    $destroy_isa_unsorted_of{ $caller_package } = undef
+        if ($flags{isa_unsorted});
 
     _init_class_cache( $caller_package )
         if ($flags{cache});
@@ -90,7 +95,22 @@ sub import {
     else {
         croak "Illegal import flags constructor => '$flags{constructor}', cache => '$flags{cache}'";
     }
+}
 
+sub import {
+    my $caller_package = caller;
+
+    my %flags = (@_>=3)
+            ? @_[1..$#_]
+            : (@_==2) && $_[1] >=2
+                ? ( constructor =>  'basic', cache => 0 )
+                : ( constructor => 'normal', cache => 0);
+    $flags{cache} = 0 if not defined $flags{cache};
+    $flags{constructor} = 'normal' if not defined $flags{constructor};
+
+    _init_import($caller_package, %flags);
+
+    no strict qw(refs);
     for my $sub ( @exported_subs ) {
         *{ $caller_package . '::' . $sub } = \&{$sub};
     }
@@ -130,11 +150,6 @@ sub MODIFY_HASH_ATTRIBUTES {
                     $referent->{${$_[0]}} = $_[1];
                     return;
                 }
-            }
-            if (defined($optimization_level_of{$package}) 
-                && $optimization_level_of{$package} >= 3) {
-                 no strict qw(refs);
-		         *{ $package . '::___' . $getter } = \$attr;
             }
         }
         undef $attr;
@@ -249,39 +264,79 @@ sub new {
     return $new_obj;
 }
 
+
+# Copied form Class::Std for performance
+my %_hierarchy_of;
+
+sub _hierarchy_of {
+    my ($class) = @_;
+
+    return @{$_hierarchy_of{$class}} if exists $_hierarchy_of{$class};
+
+    no strict 'refs';
+
+    my @hierarchy = $class;
+    my @parents   = @{$class.'::ISA'};
+
+    while (defined (my $parent = shift @parents)) {
+        push @hierarchy, $parent;
+        push @parents, @{$parent.'::ISA'};
+    }
+
+    # only sort if sorting is of any interest
+    # BIG speedup for classes with a long linear inheritance tree -
+    # may cause trouble with diamond inheritance.
+    # Sorting must be disabled by user
+    if (! exists $destroy_isa_unsorted_of{$class}) {
+        my %seen;
+        # maybe applying the Schwarzian transform could help?
+        # ... and sort {} grep {} @list runs through the list twice...
+        return @{$_hierarchy_of{$class}} =
+            sort { $a->isa($b) ? -1
+                   : $b->isa($a) ? +1
+                   :                0
+                   }
+                   grep { ! exists $seen{$_} and $seen{$_} = 1 } @hierarchy;
+    }
+    else {
+        my %seen;
+        return @{$_hierarchy_of{$class}} = grep { ! exists $seen{$_} and $seen{$_} = 1 } @hierarchy;
+    }
+}
+
 # DESTROY looks a bit cryptic, thus needs to be explained...
 #
 # It performs the following tasks:
 # - traverse the @ISA hierarchy
 #   - for every base class
 #       - call DEMOLISH if there is such a method with $_[0], ${$_[0]} as
-#         arguments (read as: $self, $id).
-#       - delete the element with key ${ $_[0] } from all :ATTR hashes
+#         arguments (read as: $self, $ident).
+#       - delete the element with key ${ $_[0] } (read as: $ident)from all :ATTR hashes
+#
 sub DESTROY {
     my $ident = ${$_[0]};
     my $class = ref $_[0];
     push @_, $ident;
-
-    no strict qw(refs);
-
     # Shortcut: check @ISA - saves us a method call if 0...
-    DEMOLISH: for my $base_class (scalar @{ "$class\::ISA"}
-        ? Class::Std::_hierarchy_of($class) 
-        : ($class) ) {
+#    DEMOLISH: for my $base_class (scalar @{ "$class\::ISA" }
+#        ? Class::Std::_hierarchy_of($class)
+#        : ($class) ) {
+    no strict qw(refs);
+    for my $base_class (exists $_hierarchy_of{$class} ? @{$_hierarchy_of{$class}} : _hierarchy_of($class)) {
         # call by & to tell perl that it doesn't need to put up a new argument
         # stack
-        &{"$base_class\::DEMOLISH"} 
+        &{"$base_class\::DEMOLISH"}
             if ( exists(&{"$base_class\::DEMOLISH"}) );
 
-        # postfix for saves a block
-        delete $_->{ref}->{$ident} for (@{$attribute{$base_class}});
-    }
-
+        delete $_->{ref}->{ $ident }
+            for (@{$attribute{$base_class}});
+   }
     # call with @_ as arguments - dirty but fast...
     &Class::Std::Fast::_cache if exists($do_cache_class_of{ $class });
-
-    return;
 }
+
+# Maybe we could speed up DESTROY by putting specific DESTROY methods
+# into Class::Std::Fast classes via symbol table
 
 sub _cache {
     push @{ $object_cache_of{ ref $_[0] }}, bless $_[0], ref $_[0];
@@ -293,19 +348,30 @@ sub END {
     *Class::Std::Fast::_cache = sub {};
 }
 
+# save away real can. We need can() [the real one] in
+# Class::Std::Fast::Storable - implementing STORBALE_freeze_pre / post
+# via AUTOMETHOD is a bad idea, anyway...
+
+sub real_can;
+# *real_can = \&CORE::UNIVERSAL::can;
+
 # Override can to make it work with AUTOMETHODs
 # Slows down can() for all objects
 {
     my $real_can = \&UNIVERSAL::can;
     no warnings qw(redefine once);
     *UNIVERSAL::can = sub {
+        defined $_[0] or return;
         my ($invocant, $method_name) = @_;
 
         if (my $sub_ref = $real_can->(@_)) {
             return $sub_ref;
         }
 
-        for my $parent_class ( Class::Std::_hierarchy_of(ref $invocant || $invocant) ) {
+        # call to Class::Std::_hierarchy_of replaced by hash lookup
+        for my $parent_class ( exists $_hierarchy_of{ ref $invocant || $invocant }
+            ? @{ $_hierarchy_of{ ref $invocant || $invocant }}
+            : Class::Std::Fast::_hierarchy_of(ref $invocant || $invocant) ) {
             no strict 'refs';
             if (my $automethod_ref = *{$parent_class.'::AUTOMETHOD'}{CODE}) {
                 local $CALLER::_ = $_;
@@ -332,7 +398,7 @@ Class::Std::Fast - faster but less secure than Class::Std
 
 =head1 VERSION
 
-This document describes Class::Std::Fast 0.0.5
+This document describes Class::Std::Fast 0.0.6
 
 =head1 SYNOPSIS
 
@@ -348,7 +414,7 @@ This document describes Class::Std::Fast 0.0.5
 
 =head1 DESCRIPTION
 
-Class::Std::Fast allows you to use the beautifull API of Class::Std in a
+Class::Std::Fast allows you to use the beautiful API of Class::Std in a
 faster way than Class::Std does.
 
 You can get the object's ident via scalarifiyng your object.
@@ -388,7 +454,7 @@ for downward compatibility.
 Imported from L<Class::Std>. Please look at the documentation from
 L<Class::Std> for more details.
 
-=head2 Method for accessing Class::Std::Fast's internals
+=head2 Methods for accessing Class::Std::Fast's internals
 
 Class::Std::Fast exposes some of it's internals to allow the construction
 of Class::Std::Fast based objects from outside the auto-generated
@@ -441,6 +507,17 @@ facility.
 
 =head1 EXTENSIONS TO Class::Std
 
+=head2 Methods
+
+=head3 real_can
+
+Class::Std::Fast saves away UNIVERSAL::can as Class::Std::Fast::real_can before
+overwriting it. You should not use real_can, because it does not check for
+subroutines implemented via AUTOMETHOD.
+
+It is there if you need the old can() for speed reasons, and know what you're
+doing.
+
 =head2 Constructors
 
 Class::Std::Fast allows the user to chose between several constructor
@@ -465,7 +542,7 @@ Does not perform any attribute initializations.
 Really fast, but very basic.
 
 =item * No constructor
- 
+
  use Class::Std::Fast qw(3);
  use Class::Std::Fast constructor => 'none';
 
@@ -489,6 +566,18 @@ If you use the Object Cache (see below) the recommended usage is:
 
 =back
 
+=head2 Destructors
+
+Class::Std sorts the @ISA hierarchy before traversing it to avoid cleaning
+up the wrong class first. However, this is unneccessary if the class in
+question has a linear inheritance tree.
+
+Class authors may disable sorting by calling
+
+ use Class::Std::Fast unsorted => 1;
+
+Use only if you know your class' complete inheritance tree...
+
 =head2 Object Cache
 
 =head3 Synopsis
@@ -498,7 +587,7 @@ If you use the Object Cache (see below) the recommended usage is:
 =head3 Description
 
 While inside out objects are basically an implementation of the Flyweight
-Pattern (object data is stored outside the object), there's still some aspect
+Pattern (object data is stored outside the object), there's still one aspect
 missing: object reuse. While Class::Std::Fast does not provide flyweights
 in the classical sense (one object re-used again and again), it provides
 something close to it: An object cache for re-using destroyed objects.
@@ -509,23 +598,23 @@ cached objects as keys, and a list ref of cached objects as values.
 The object cache is filled by the DESTROY method exported into all
 Class::Std::Fast based objects: Instead of actually destroying the blessed
 scalar reference (Class::Std::Fast based objects are nothing more), the
-object to be destroyed is pushed it's class' object cache.
+object to be destroyed is pushed into it's class' object cache.
 
 new() in turn does not need to create a new blessed scalar, but can just pop
 one off the object cache (which is a magnitude faster).
 
 Using the object cache is recommended for persistent applications (like
-running under mod_perl), or applications creating, destroying and again
-creating lots of Class::Std::Fast based objects.
+running under mod_perl), or applications creating and destroying
+lots of Class::Std::Fast based objects again and again.
 
 The exported constructor automatically uses the Object Cache when caching is
-enabled by setting the cache import fla to a true value.
+enabled by setting the cache import flag to a true value.
 
 For an example of a user-defined constructor see L</Constructors> above.
 
 =head3 Memory overhead
 
-The object cache trades speed for memory. This is very perlish way for
+The object cache trades speed for memory. This is a very perlish way for
 adressing performance issues, but may cause your application to blow up
 if you're short of memory.
 
@@ -549,7 +638,15 @@ Additional diagnostics are:
 
 =over
 
-=item * 
+=item * Class::Std::Fast loaded too late - put >use Class::Std::Fast< somewhere at the top of your application (warning)
+
+Class::Std has been "use"d before Class::Std::Fast. While both classes
+happily coexist in one application, Class::Std::Fast must be loaded first
+for maximum speedup.
+
+This is due to both classes overwriting UNIVERSAL::can. Class::Std::Fast uses
+the original (fast) can where appropritate, but cannot access it if
+Class::Std has overwritten it before with it's (slow) replacement.
 
 =back
 
@@ -627,19 +724,19 @@ $Author: ac0v $
 
 =item Id
 
-$Id: Fast.pm 211 2007-12-02 03:57:28Z ac0v $
+$Id: Fast.pm 435 2008-05-05 11:09:50Z ac0v $
 
 =item Revision
 
-$Revision: 211 $
+$Revision: 435 $
 
 =item Date
 
-$Date: 2007-12-02 04:57:28 +0100 (Sun, 02 Dec 2007) $
+$Date: 2008-05-05 13:09:50 +0200 (Mon, 05 May 2008) $
 
 =item HeadURL
 
-$HeadURL: http://svn.hyper-framework.org/Hyper/Class-Std-Fast/branches/2007-12-02/lib/Class/Std/Fast.pm $
+$HeadURL: file:///var/svn/repos/Hyper/Class-Std-Fast/branches/0.0.6/lib/Class/Std/Fast.pm $
 
 =back
 
