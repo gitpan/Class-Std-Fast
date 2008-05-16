@@ -1,4 +1,7 @@
 Revision history for Class-Std-Fast
+0.0.7   Fri May 16 15:00:28 CEST 2008
+        * factored out getter / setter creation into separate functions to allow XS surgery
+
 0.0.6   Mon May  5 13:06:53 CEST 2008
         * Storable freeze/thaw speedup
         * DESTROY speedup for classes using inheritance

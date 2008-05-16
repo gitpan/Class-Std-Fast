@@ -1,6 +1,6 @@
 ---
 name: Class-Std-Fast
-version: v0.0.6
+version: v0.0.7
 author:
   - "Andreas 'ac0v' Specht - ACID@cpan.org"
 abstract: faster but less secure than Class::Std
@@ -17,10 +17,10 @@ build_requires:
 provides:
   Class::Std::Fast:
     file: lib/Class/Std/Fast.pm
-    version: v0.0.6
+    version: v0.0.7
   Class::Std::Fast::Storable:
     file: lib/Class/Std/Fast/Storable.pm
-    version: v0.0.6
+    version: v0.0.7
 generated_by: Module::Build version 0.2806
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.2.html

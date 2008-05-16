@@ -1,6 +1,6 @@
 package Class::Std::Fast::Storable;
 
-use version; $VERSION = qv('0.0.6');
+use version; $VERSION = qv('0.0.7');
 use strict;
 use warnings;
 use Carp;
@@ -82,7 +82,7 @@ sub STORABLE_freeze {
         # Original line:
         # push @package_list, grep { ! $package_seen{$_}++; } @{"${package}::ISA"};
         # This one's faster...
-        push @package_list, grep { ! exists $package_seen{$_} and $package_seen{$_} = 1; } @{"${package}::ISA"};
+        push @package_list, grep { ! exists $package_seen{$_} && do { $package_seen{$_} = undef; 1; } } @{"${package}::ISA"};
 
         #look for any attributes of this object for this package
         my $attr_ref = $attributes_of_ref->{$package} or next PACKAGE;
@@ -91,9 +91,8 @@ sub STORABLE_freeze {
         ATTR:              # examine attributes from known packages only
         for ( keys %{$attr_ref} ) {
             #nothing to do if attr not set for this object
-            exists $attr_ref->{$_}{$id} or next ATTR;
-            #save the attr by name into the package hash
-            $frozen_attr{$package}{ $_ } = $attr_ref->{$_}{$id};
+            exists $attr_ref->{$_}{$id}
+                and $frozen_attr{$package}{ $_ } = $attr_ref->{$_}{$id}; # save the attr by name into the package hash
         }
     }
     Class::Std::Fast::real_can($self, 'STORABLE_freeze_post')
@@ -110,7 +109,7 @@ sub STORABLE_thaw {
     # zillions of objects...
     my $self = shift;
     my $cloning = shift;
-    my $frozen_attr_ref = $_[1]; # TODO Ha?? what's in $_[0], then ??? Check.
+    my $frozen_attr_ref = $_[1]; # $_[0] is the frozen anon scalar.
 
     Class::Std::Fast::real_can($self, 'STORABLE_thaw_pre')
         && $self->STORABLE_thaw_pre($cloning, $frozen_attr_ref);
@@ -161,7 +160,7 @@ Class::Std::Fast::Storable - Fast Storable InsideOut objects
 
 =head1 VERSION
 
-This document describes Class::Std::Fast::Storable 0.0.6
+This document describes Class::Std::Fast::Storable 0.0.7
 
 =head1 SYNOPSIS
 
@@ -242,19 +241,19 @@ $Author: ac0v $
 
 =item Id
 
-$Id: Storable.pm 435 2008-05-05 11:09:50Z ac0v $
+$Id: Storable.pm 454 2008-05-16 13:07:45Z ac0v $
 
 =item Revision
 
-$Revision: 435 $
+$Revision: 454 $
 
 =item Date
 
-$Date: 2008-05-05 13:09:50 +0200 (Mon, 05 May 2008) $
+$Date: 2008-05-16 15:07:45 +0200 (Fri, 16 May 2008) $
 
 =item HeadURL
 
-$HeadURL: file:///var/svn/repos/Hyper/Class-Std-Fast/branches/0.0.6/lib/Class/Std/Fast/Storable.pm $
+$HeadURL: file:///srv/cluster/svn/repos/Hyper/Class-Std-Fast/branches/0.0.7/lib/Class/Std/Fast/Storable.pm $
 
 =back
 

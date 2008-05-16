@@ -1,6 +1,6 @@
 package Class::Std::Fast;
 
-use version; $VERSION = qv('0.0.6');
+use version; $VERSION = qv('0.0.7');
 use strict;
 use warnings;
 use Carp;
@@ -129,6 +129,23 @@ sub import {
     }
 }
 
+sub __create_getter {
+    my ($package, $referent, $getter) = @_;
+    no strict 'refs';
+    *{$package.'::get_'.$getter} = sub {
+        return $referent->{${$_[0]}};
+    }
+}
+
+sub __create_setter {
+    my ($package, $referent, $setter) = @_;
+    no strict 'refs';
+    *{$package.'::set_'.$setter} = sub {
+        $referent->{${$_[0]}} = $_[1];
+        return $_[0];
+    }
+}
+
 sub MODIFY_HASH_ATTRIBUTES {
     my ($package, $referent, @attrs) = @_;
     for my $attr (@attrs) {
@@ -139,17 +156,10 @@ sub MODIFY_HASH_ATTRIBUTES {
             $name     = Class::Std::_extract_name($config);
             $init_arg = Class::Std::_extract_init_arg($config) || $name;
             if ($getter = Class::Std::_extract_get($config) || $name) {
-                no strict 'refs';
-                *{$package.'::get_'.$getter} = sub {
-                    return $referent->{${$_[0]}};
-                }
+                __create_getter($package, $referent, $getter, $name);
             }
             if ($setter = Class::Std::_extract_set($config) || $name) {
-                no strict 'refs';
-                *{$package.'::set_'.$setter} = sub {
-                    $referent->{${$_[0]}} = $_[1];
-                    return;
-                }
+                __create_setter($package, $referent, $setter, $name);
             }
         }
         undef $attr;
@@ -160,7 +170,7 @@ sub MODIFY_HASH_ATTRIBUTES {
             name     => $name || $init_arg || $getter || $setter || '????',
         };
     }
-    return grep {defined} @attrs;
+    return grep { defined } @attrs;
 }
 
 sub _DUMP {
@@ -398,7 +408,7 @@ Class::Std::Fast - faster but less secure than Class::Std
 
 =head1 VERSION
 
-This document describes Class::Std::Fast 0.0.6
+This document describes Class::Std::Fast 0.0.7
 
 =head1 SYNOPSIS
 
@@ -724,19 +734,19 @@ $Author: ac0v $
 
 =item Id
 
-$Id: Fast.pm 435 2008-05-05 11:09:50Z ac0v $
+$Id: Fast.pm 454 2008-05-16 13:07:45Z ac0v $
 
 =item Revision
 
-$Revision: 435 $
+$Revision: 454 $
 
 =item Date
 
-$Date: 2008-05-05 13:09:50 +0200 (Mon, 05 May 2008) $
+$Date: 2008-05-16 15:07:45 +0200 (Fri, 16 May 2008) $
 
 =item HeadURL
 
-$HeadURL: file:///var/svn/repos/Hyper/Class-Std-Fast/branches/0.0.6/lib/Class/Std/Fast.pm $
+$HeadURL: file:///srv/cluster/svn/repos/Hyper/Class-Std-Fast/branches/0.0.7/lib/Class/Std/Fast.pm $
 
 =back
 
