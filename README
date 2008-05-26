@@ -1,4 +1,4 @@
-Class::Std::Fast version 0.0.7
+Class::Std::Fast version 0.0.8
 
 This module provides a faster but less secure version of Class::Std
 
@@ -23,7 +23,7 @@ Alternatively, to install with Module::Build, you can use the following commands
 
 COPYRIGHT AND LICENCE
 
-Copyright (C) 2007, Andreas 'ac0v' Specht
+Copyright (C) 2008, Andreas 'ac0v' Specht
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself.

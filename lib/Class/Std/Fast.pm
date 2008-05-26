@@ -1,6 +1,6 @@
 package Class::Std::Fast;
 
-use version; $VERSION = qv('0.0.7');
+use version; $VERSION = qv('0.0.8');
 use strict;
 use warnings;
 use Carp;
@@ -28,6 +28,8 @@ my %do_cache_class_of = ();
 my %destroy_isa_unsorted_of = ();
 
 my %attribute;
+
+
 my %optimization_level_of = ();
 my $instance_counter      = 1;
 
@@ -46,6 +48,19 @@ my @exported_extension_subs = qw(
     MODIFY_CODE_ATTRIBUTES
     MODIFY_HASH_ATTRIBUTES
 );
+
+sub _cache_class_ref () {
+    croak q{you can't call this method in your namespace}
+        if 0 != index caller, 'Class::Std::';
+    return \%do_cache_class_of;
+}
+
+sub _attribute_ref () {
+    croak q{you can't call this method in your namespace}
+        if 0 != index caller, 'Class::Std::';
+    return \%attribute;
+}
+
 sub _get_internal_attributes {
     croak q{you can't call this method in your namespace}
         if 0 != index caller, 'Class::Std::';
@@ -408,7 +423,7 @@ Class::Std::Fast - faster but less secure than Class::Std
 
 =head1 VERSION
 
-This document describes Class::Std::Fast 0.0.7
+This document describes Class::Std::Fast 0.0.8
 
 =head1 SYNOPSIS
 
@@ -635,9 +650,9 @@ the actual usage is system dependent and something between 4 and 32 bytes
 more).
 
 If you are anxious about falling short of memory, only enable caching for
-those classes whose objects you now to be frequently created and destroyed,
-and leave it off for the less frequently used classes - this gives you both
-speed benefits, and avoids holding a cache of object that will never be
+those classes whose objects you know to be frequently created and destroyed,
+and leave it turned off for the less frequently used classes - this gives you
+both speed benefits, and avoids holding a cache of object that will never be
 needed again.
 
 =head1 DIAGNOSTICS
@@ -734,19 +749,19 @@ $Author: ac0v $
 
 =item Id
 
-$Id: Fast.pm 454 2008-05-16 13:07:45Z ac0v $
+$Id: Fast.pm 469 2008-05-26 11:26:35Z ac0v $
 
 =item Revision
 
-$Revision: 454 $
+$Revision: 469 $
 
 =item Date
 
-$Date: 2008-05-16 15:07:45 +0200 (Fri, 16 May 2008) $
+$Date: 2008-05-26 13:26:35 +0200 (Mon, 26 May 2008) $
 
 =item HeadURL
 
-$HeadURL: file:///srv/cluster/svn/repos/Hyper/Class-Std-Fast/branches/0.0.7/lib/Class/Std/Fast.pm $
+$HeadURL: file:///var/svn/repos/Hyper/Class-Std-Fast/branches/0.0.8/lib/Class/Std/Fast.pm $
 
 =back
 

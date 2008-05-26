@@ -1,6 +1,6 @@
 package Class::Std::Fast::Storable;
 
-use version; $VERSION = qv('0.0.7');
+use version; $VERSION = qv('0.0.8');
 use strict;
 use warnings;
 use Carp;
@@ -160,7 +160,7 @@ Class::Std::Fast::Storable - Fast Storable InsideOut objects
 
 =head1 VERSION
 
-This document describes Class::Std::Fast::Storable 0.0.7
+This document describes Class::Std::Fast::Storable 0.0.8
 
 =head1 SYNOPSIS
 
@@ -241,19 +241,19 @@ $Author: ac0v $
 
 =item Id
 
-$Id: Storable.pm 454 2008-05-16 13:07:45Z ac0v $
+$Id: Storable.pm 469 2008-05-26 11:26:35Z ac0v $
 
 =item Revision
 
-$Revision: 454 $
+$Revision: 469 $
 
 =item Date
 
-$Date: 2008-05-16 15:07:45 +0200 (Fri, 16 May 2008) $
+$Date: 2008-05-26 13:26:35 +0200 (Mon, 26 May 2008) $
 
 =item HeadURL
 
-$HeadURL: file:///srv/cluster/svn/repos/Hyper/Class-Std-Fast/branches/0.0.7/lib/Class/Std/Fast/Storable.pm $
+$HeadURL: file:///var/svn/repos/Hyper/Class-Std-Fast/branches/0.0.8/lib/Class/Std/Fast/Storable.pm $
 
 =back
 

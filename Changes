@@ -1,4 +1,7 @@
 Revision history for Class-Std-Fast
+0.0.8   Mon May 26 13:25:26 CEST 2008
+        * Allow access to even more internals for even more XS surgery
+
 0.0.7   Fri May 16 15:00:28 CEST 2008
         * factored out getter / setter creation into separate functions to allow XS surgery
 
